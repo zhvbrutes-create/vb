@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bivencas Crypto Tycoon</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --card: #141414;
+            --accent: #e11d48;
+            --accent-hover: #fb7185;
+            --text: #ffffff;
+            --gray: #71717a;
+            --green: #22c55e;
+            --red: #ef4444;
+            --yellow: #facc15;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', -apple-system, sans-serif;
+            margin: 0; padding: 0;
+            overflow: hidden; /* Prevent scrolling issues */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        .container { height: 100vh; display: flex; flex-direction: column; }
+
+        .page { display: none; flex: 1; padding: 20px; overflow-y: auto; padding-bottom: 100px; animation: fadeIn 0.3s ease-out; }
+        .page.active { display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Навигация */
+        .tab-bar {
+            position: fixed; bottom: 0; width: 100%;
+            background: #000; display: flex; justify-content: space-around;
+            padding: 15px 0; border-top: 1px solid #27272a; z-index: 1000;
+        }
+        .tab-item { text-align: center; color: var(--gray); font-size: 10px; cursor: pointer; flex: 1; transition: 0.2s; }
+        .tab-item.active { color: var(--accent); }
+        .tab-item span { display: block; font-size: 20px; margin-bottom: 4px; }
+
+        /* Общие компоненты */
+        .card { background: var(--card); padding: 15px; border-radius: 12px; margin-bottom: 15px; }
+        .btn {
+            background: var(--accent); color: white; border: none;
+            padding: 14px 20px; border-radius: 12px; font-weight: bold;
+            width: 100%; transition: 0.2s; cursor: pointer;
+        }
+        .btn:hover:not(:disabled) { background: var(--accent-hover); }
+        .btn:disabled { background: #27272a; color: #52525b; cursor: not-allowed; }
+        input { background: #1a1a1a; border: 1px solid #333; color: white; padding: 12px; border-radius: 8px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
+
+        /* Баланс и Профиль */
+        .balance-info {
+            background: linear-gradient(135deg, #1e1b4b, #431407); /* Dark purple-red gradient */
+            padding: 30px; border-radius: 24px; text-align: center;
+            border: 1px solid #e11d4844; margin-bottom: 20px;
+        }
+        .balance-label { font-size: 14px; opacity: 0.6; margin-bottom: 5px; }
+        .balance-value { font-size: 42px; font-weight: 800; color: var(--accent); text-shadow: 0 0 15px #e11d4844; }
+        .crypto-balance-value { font-size: 24px; font-weight: 600; color: var(--yellow); margin-top: 10px; }
+        .profile-nick { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+
+        /* Главная - майнинг */
+        .mining-area { text-align: center; margin-top: 20px; }
+        .mining-button {
+            width: 150px; height: 150px; border-radius: 50%; background: var(--accent);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 80px; font-weight: bold; cursor: pointer;
+            margin: 20px auto; transition: transform 0.1s;
+            box-shadow: 0 0 25px var(--accent);
+        }
+        .mining-button:active { transform: scale(0.95); }
+        .mining-feedback { font-size: 24px; color: var(--yellow); opacity: 0; transition: opacity 0.3s, transform 0.3s; position: absolute; }
+
+        /* Апгрейды */
+        .upgrade-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #27272a; }
+        .upgrade-item:last-child { border-bottom: none; }
+        .upgrade-info h4 { margin: 0; font-size: 16px; }
+        .upgrade-info p { margin: 5px 0 0; font-size: 12px; color: var(--gray); }
+        .upgrade-btn { background: var(--green); padding: 8px 15px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+        .upgrade-btn:disabled { background: #27272a; color: #52525b; cursor: not-allowed; }
+
+        /* История */
+        .history-entry { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #27272a; font-size: 13px; }
+        .history-entry .amount { font-weight: bold; }
+        .history-entry .win { color: var(--green); }
+        .history-entry .loss { color: var(--red); }
+        .history-entry .neutral { color: var(--gray); }
+
+        /* Кланы */
+        .clan-list-item { background: var(--card); padding: 15px; border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .clan-name { font-size: 18px; font-weight: bold; }
+        .clan-points { color: var(--yellow); }
+
+        /* Рулетка */
+        .roulette-container { position: relative; width: 280px; height: 280px; margin: 20px auto; }
+        #roulette-wheel {
+            width: 100%; height: 100%; border-radius: 50%;
+            background-image: url('https://i.imgur.com/v8tT9oP.png'); /* Изображение колеса рулетки */
+            background-size: cover;
+            transition: transform 4s cubic-bezier(0.1, 0.7, 0.1, 1);
+        }
+        .roulette-pointer {
+            position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
+            width: 0; height: 0; border-left: 15px solid transparent;
+            border-right: 15px solid transparent; border-top: 30px solid var(--accent); z-index: 10;
+        }
+
+        /* Мины */
+        .mines-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 20px; }
+        .mine-cell {
+            aspect-ratio: 1; background: #2a2a35; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; border: 1px solid #27272a; cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .mine-cell.open-win { background: #14532d; border-color: var(--green); }
+        .mine-cell.open-lose { background: #450a0a; border-color: var(--red); }
+        .mine-cell:disabled { cursor: not-allowed; }
+        .mine-settings { display: flex; gap: 10px; margin-bottom: 15px; }
+        .mine-bet-input { width: 100px; }
+        .mine-count-slider { flex-grow: 1; -webkit-appearance: none; height: 8px; background: #333; border-radius: 5px; outline: none; }
+        .mine-count-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+        .mine-count-slider::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+
+        /* Dice */
+        .dice-display { font-size: 60px; text-align: center; margin-top: 20px; font-weight: bold; color: var(--yellow); }
+        .dice-controls { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 20px; }
+        .dice-bet-btn { flex: 1; min-width: 100px; background: #27272a; color: var(--text); }
+        .dice-bet-btn.active { background: var(--accent); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ГЛАВНАЯ (Майнинг) -->
+        <div id="p-main" class="page active">
+            <div class="balance-info">
+                <div class="balance-label">ВАШ БАЛАНС (USDT)</div>
+                <div id="main-balance" class="balance-value">0.00 💰</div>
+                <div id="main-crypto-balance" class="crypto-balance-value">0.00 BTC</div>
+            </div>
+
+            <div class="card mining-area">
+                <div id="mining-button" class="mining-button">⛏️</div>
+                <p>Мощность за клик: <span id="mining-power">1.0</span> BTC</p>
+                <p>Пассивный майнинг: <span id="idle-mining-rate">0.1</span> BTC/сек</p>
+                <div id="mining-feedback-container" style="position: relative; height: 30px;"></div>
+            </div>
+
+            <button class="btn" onclick="switchPage('p-shop')">МАГАЗИН УЛУЧШЕНИЙ</button>
+            <button class="btn" style="background:#facc15; margin-top:10px;" onclick="sellCrypto()">ПРОДАТЬ КРИПТУ</button>
+        </div>
+
+        <!-- МАГАЗИН УЛУЧШЕНИЙ -->
+        <div id="p-shop" class="page">
+            <div onclick="switchPage('p-main')" style="color: var(--gray); margin-bottom: 15px; cursor: pointer;">← Назад</div>
+            <h2>Магазин Улучшений 🛒</h2>
+            <div id="upgrades-list">
+                <!-- Улучшения будут загружены сюда -->
+            </div>
+        </div>
+
+        <!-- БОНУСЫ -->
+        <div id="p-bonuses" class="page">
+            <h2>Бонусы 🎁</h2>
+            <div class="card">
+                <h3>Ежедневный бонус</h3>
+                <p style="color: var(--gray);">+3,333 USDT каждые 4 часа</p>
+                <div id="bonus-timer" style="font-size: 24px; font-weight: bold; margin: 15px 0; color: var(--yellow);"></div>
+                <button id="bonus-btn" class="btn" onclick="claimBonus()">ПОЛУЧИТЬ</button>
+            </div>
+        </div>
+
+        <!-- ИГРЫ (КАЗИНО) -->
+        <div id="p-games" class="page">
+            <h2>Казино 🎰</h2>
+            <div class="card" onclick="switchPage('g-roulette')"><span>🎡 Рулетка</span></div>
+            <div class="card" onclick="switchPage('g-mines')"><span>💣 Мины</span></div>
+            <div class="card" onclick="switchPage('g-dice')"><span>🎲 Dice (0-12)</span></div>
+        </div>
+
+        <!-- ТОП ИГРОКОВ -->
+        <div id="p-top" class="page">
+            <h2>Топ Майнеров 🏆</h2>
+            <div class="card">
+                <p>Рейтинг по добытой крипте (BTC):</p>
+                <div id="top-users-list">
+                    <!-- Загружается через API -->
+                </div>
+            </div>
+        </div>
+
+        <!-- КЛАНЫ -->
+        <div id="p-clans" class="page">
+            <h2>Кланы 👥</h2>
+            <div class="card">
+                <input type="text" id="clan-name-input" placeholder="Название клана">
+                <button class="btn" onclick="createClan()">СОЗДАТЬ КЛАН (0 USDT)</button>
+            </div>
+            <div id="clans-list">
+                <!-- Загружается через API -->
+            </div>
+        </div>
+
+        <!-- ПРОФИЛЬ -->
+        <div id="p-profile" class="page">
+            <div onclick="switchPage('p-main')" style="color: var(--gray); margin-bottom: 15px; cursor: pointer;">← Назад</div>
+            <h2>Мой Профиль 👤</h2>
+            <div class="card">
+                <div class="profile-nick" id="profile-nickname-display"></div>
+                <p style="color: var(--gray);">Смена ника и цвета (500 USDT)</p>
+                <input type="text" id="profile-new-nick" placeholder="Новый ник">
+                <input type="color" id="profile-new-color" style="height: 50px; padding: 2px;">
+                <button class="btn" onclick="saveProfile()">СОХРАНИТЬ ИЗМЕНЕНИЯ</button>
+            </div>
+        </div>
+
+        <!-- ИГРА: РУЛЕТКА -->
+        <div id="g-roulette" class="page">
+            <div onclick="switchPage('p-games')" style="color: var(--gray); margin-bottom: 15px; cursor: pointer;">← Назад</div>
+            <h2>Рулетка 🎡</h2>
+            <div class="roulette-container">
+                <div class="roulette-pointer"></div>
+                <div id="roulette-wheel"></div>
+            </div>
+            <button class="btn" onclick="spinRoulette()">КРУТИТЬ (100 USDT)</button>
+            <div class="card" style="margin-top: 20px;">
+                <h3>Последние результаты:</h3>
+                <div id="roulette-history" style="display: flex; flex-wrap: wrap; gap: 5px;"></div>
+            </div>
+        </div>
+
+        <!-- ИГРА: МИНЫ -->
+        <div id="g-mines" class="page">
+            <div onclick="switchPage('p-games')" style="color: var(--gray); margin-bottom: 15px; cursor: pointer;">← Назад</div>
+            <h2>Мины 💣</h2>
+            <div class="card">
+                <div class="mine-settings">
+                    <input type="number" id="mine-bet" class="mine-bet-input" value="100" min="10" max="100000">
+                    <input type="range" id="mine-count-slider" class="mine-count-slider" min="1" max="24" value="3">
+                    <span id="mine-count-display" style="width: 30px; text-align: right;">3</span>
+                </div>
+                <div id="mines-multiplier" style="font-size: 24px; font-weight: bold; text-align: center; margin-bottom: 15px;">x1.00</div>
+                <button id="mine-start-btn" class="btn" onclick="startMines()">НАЧАТЬ ИГРУ</button>
+                <button id="mine-cashout-btn" class="btn" style="background:var(--green); display:none;" onclick="cashoutMines()">ЗАБРАТЬ <span id="mines-cashout-value"></span></button>
+            </div>
+            <div class="mines-grid" id="mines-board"></div>
+        </div>
+
+        <!-- ИГРА: DICE -->
+        <div id="g-dice" class="page">
+            <div onclick="switchPage('p-games')" style="color: var(--gray); margin-bottom: 15px; cursor: pointer;">← Назад</div>
+            <h2>Dice (0-12) 🎲</h2>
+            <div class="card">
+                <div id="dice-result" class="dice-display">?</div>
+                <input type="number" id="dice-bet" value="50" min="10" max="10000">
+                <div class="dice-controls">
+                    <button class="btn dice-bet-btn" data-type="less" data-mult="2.2" onclick="playDice(this)">Меньше 6 (x2.2)</button>
+                    <button class="btn dice-bet-btn" data-type="equal" data-mult="12" onclick="playDice(this)">Равно 6 (x12)</button>
+                    <button class="btn dice-bet-btn" data-type="more" data-mult="2.2" onclick="playDice(this)">Больше 6 (x2.2)</button>
+                </div>
+            </div>
+            <div class="card" style="margin-top: 20px;">
+                <h3>Последние броски:</h3>
+                <div id="dice-history" style="display: flex; flex-wrap: wrap; gap: 5px;"></div>
+            </div>
+        </div>
+
+
+        <!-- ОБЩАЯ ИСТОРИЯ (для всех игр) -->
+        <div id="p-history" class="page">
+            <div onclick="switchPage('p-main')" style="color: var(--gray); margin-bottom: 15px; cursor: pointer;">← Назад</div>
+            <h2>История 📜</h2>
+            <div class="card" id="global-history-list">
+                <!-- Элементы истории будут загружены сюда -->
+            </div>
+        </div>
+
+        <!-- ТАБ-БАР -->
+        <div class="tab-bar">
+            <div class="tab-item active" data-target="p-main"><span>🏠</span>Главная</div>
+            <div class="tab-item" data-target="p-bonuses"><span>🎁</span>Бонусы</div>
+            <div class="tab-item" data-target="p-games"><span>🎮</span>Игры</div>
+            <div class="tab-item" data-target="p-top"><span>🏆</span>Топ</div>
+            <div class="tab-item" data-target="p-clans"><span>👥</span>Кланы</div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin; // Или "https://your-ngrok-or-github-domain.io"
+        let USER_ID = null; // Будет установлен при инициализации
+        let USER_USERNAME = "Unknown";
+        let USER_DATA = {}; // Хранит все данные пользователя
+
+        document.addEventListener('DOMContentLoaded', () => {
+            tg.expand();
+            tg.ready();
+            
+            // Инициализация пользователя при открытии Mini App
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                USER_ID = tg.initDataUnsafe.user.id;
+                USER_USERNAME = tg.initDataUnsafe.user.username || tg.initDataUnsafe.user.first_name || `Player_${USER_ID}`;
+                
+                fetch(`${API_URL}/api/init_user`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: USER_ID, username: USER_USERNAME })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    USER_DATA = data;
+                    updateUI();
+                    startBonusTimer();
+                    startIdleMining();
+                })
+                .catch(error => console.error('Error initializing user:', error));
+            } else {
+                console.error("Telegram WebApp data not available. Running in test mode.");
+                // Для тестирования без Telegram
+                USER_ID = 12345; 
+                USER_USERNAME = "TestUser";
+                USER_DATA = { 
+                    user_id: USER_ID, nickname: USER_USERNAME, nick_color: "#FFFFFF",
+                    balance: 1000.00, crypto_balance: 50.00,
+                    mining_power: 1.0, idle_mining_rate: 0.1,
+                    last_bonus_claim: new Date(0).getTime() / 1000 // UNIX timestamp
+                };
+                updateUI();
+                startBonusTimer();
+                startIdleMining();
+            }
+
+            // Навигация по вкладкам
+            document.querySelectorAll('.tab-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const targetPageId = item.getAttribute('data-target');
+                    switchPage(targetPageId);
+                });
+            });
+
+            // Обновление UI раз в секунду для пассивного майнинга, таймеров и т.д.
+            setInterval(updateUI, 1000); 
+        });
+
+        function switchPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            
+            // Обновление активной вкладки в нижнем меню
+            document.querySelectorAll('.tab-item').forEach(item => item.classList.remove('active'));
+            document.querySelector(`.tab-item[data-target="${pageId}"]`).classList.add('active');
+
+            // Загрузка данных для специфических вкладок
+            if (pageId === 'p-shop') loadUpgrades();
+            if (pageId === 'p-clans') loadClans();
+            if (pageId === 'p-top') loadTopUsers();
+            if (pageId === 'p-profile') loadProfileData();
+            if (pageId === 'p-history') loadGlobalHistory(); // Загрузка глобальной истории
+        }
+
+        function updateUI() {
+            if (!USER_DATA.user_id) return; // Ждем инициализации пользователя
+
+            document.getElementById('main-balance').innerText = `${USER_DATA.balance.toFixed(2)} 💰`;
+            document.getElementById('main-crypto-balance').innerText = `${USER_DATA.crypto_balance.toFixed(2)} BTC`;
+            document.getElementById('mining-power').innerText = USER_DATA.mining_power.toFixed(2);
+            document.getElementById('idle-mining-rate').innerText = USER_DATA.idle_mining_rate.toFixed(2);
+            
+            // Обновление ника в профиле
+            document.getElementById('profile-nickname-display').innerText = USER_DATA.nickname;
+            document.getElementById('profile-nickname-display').style.color = USER_DATA.nick_color;
+        }
+
+        // --- ГЛАВНАЯ (МАЙНИНГ) ---
+        document.getElementById('mining-button').addEventListener('click', () => {
+            fetch(`${API_URL}/api/mine_crypto`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: USER_ID })
+            })
+            .then(response => response.json())
+            .then(data => {
+                USER_DATA.crypto_balance = data.crypto_balance;
+                updateUI();
+                showMiningFeedback();
+            })
+            .catch(error => console.error('Error mining:', error));
+        });
+
+        function showMiningFeedback() {
+            const feedbackContainer = document.getElementById('mining-feedback-container');
+            const feedback = document.createElement('div');
+            feedback.className = 'mining-feedback';
+            feedback.innerText = `+${USER_DATA.mining_power.toFixed(2)} BTC`;
+            
+            const btnRect = document.getElementById('mining-button').getBoundingClientRect();
+            feedback.style.left = `${btnRect.left + btnRect.width / 2}px`;
+            feedback.style.top = `${btnRect.top + btnRect.height / 2}px`;
+            feedback.style.transform = 'translate(-50%, -50%)';
+            
+            feedbackContainer.appendChild(feedback);
+
+            setTimeout(() => {
+                feedback.style.opacity = 1;
+                feedback.style.transform = `translate(-50%, -100%) scale(1.2)`;
+            }, 10);
+
+            setTimeout(() => {feedback.style.opacity = 0;
+                feedback.style.transform = `translate(-50%, -200%) scale(0.8)`;
+                feedback.remove();
+            }, 600);
+        }
+        
+        // Пассивный майнинг (на клиенте, но данные обновляются с сервера при каждом входе)
+        function startIdleMining() {
+            setInterval(() => {
+                USER_DATA.crypto_balance += USER_DATA.idle_mining_rate;
+                updateUI();
+            }, 1000);
+        }
+
+        function sellCrypto() {
+            const amountToSell = prompt("Сколько BTC вы хотите продать?");
+            if (amountToSell === null || isNaN(amountToSell) || parseFloat(amountToSell) <= 0) return;
+            
+            const sellAmount = parseFloat(amountToSell);
+
+            fetch(`${API_URL}/api/sell_crypto`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: USER_ID, amount_to_sell: sellAmount })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    USER_DATA.balance = data.balance;
+                    USER_DATA.crypto_balance = data.crypto_balance;
+                    updateUI();
+                    alert(`Вы продали ${sellAmount.toFixed(2)} BTC за ${data.fiat_earned.toFixed(2)} USDT. Цена: ${data.crypto_price.toFixed(2)}`);
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => console.error('Error selling crypto:', error));
+        }
+
+        // --- МАГАЗИН УЛУЧШЕНИЙ ---
+        function loadUpgrades() {
+            fetch(`${API_URL}/api/get_upgrades`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: USER_ID })
+            })
+            .then(response => response.json())
+            .then(upgrades => {
+                const upgradesList = document.getElementById('upgrades-list');
+                upgradesList.innerHTML = '';
+                upgrades.forEach(upgrade => {
+                    const upgradeElement = document.createElement('div');
+                    upgradeElement.className = 'card upgrade-item';
+                    upgradeElement.innerHTML = `
+                        <div class="upgrade-info">
+                            <h4>${upgrade.name} (Ур. ${upgrade.level})</h4>
+                            <p>${upgrade.description}</p>
+                            <p>+${upgrade.effect_power.toFixed(1)} к клику, +${upgrade.effect_idle.toFixed(1)} к пассиву</p>
+                        </div>
+                        <button class="upgrade-btn" onclick="buyUpgrade('${upgrade.id}')" ${USER_DATA.balance < upgrade.cost ? 'disabled' : ''}>
+                            Купить за ${upgrade.cost.toFixed(2)} 💰
+                        </button>
+                    `;
+                    upgradesList.appendChild(upgradeElement);
+                });
+            })
+            .catch(error => console.error('Error loading upgrades:', error));
+        }
+
+        function buyUpgrade(upgradeId) {
+            fetch(`${API_URL}/api/buy_upgrade`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: USER_ID, upgrade_id: upgradeId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    USER_DATA.balance = data.balance;
+                    USER_DATA.mining_power = data.mining_power;
+                    USER_DATA.idle_mining_rate = data.idle_mining_rate;
+                    updateUI();
+                    loadUpgrades(); // Перезагрузить список апгрейдов для обновления уровней и цен
+                    tg.HapticFeedback.notificationOccurred('success');
+                } else {
+                    alert(data.message);
+                    tg.HapticFeedback.notificationOccurred('error');
+                }
+            })
+            .catch(error => console.error('Error buying upgrade:', error));
+        }
+
+        // --- БОНУСЫ ---
+        let bonusTimerInterval;
+        function startBonusTimer() {
+            bonusTimerInterval = setInterval(() => {
+                fetch(`${API_URL}/api/get_bonus_cooldown`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: USER_ID })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const remainingSeconds = data.remaining_seconds;
+                    const bonusBtn = document.getElementById('bonus-btn');
+                    const timerDisplay = document.getElementById('bonus-timer');
+
+                    if (remainingSeconds <= 0) {
+                        bonusBtn.disabled = false;
+                        timerDisplay.innerText = "БОНУС ГОТОВ!";
+                    } else {
+                        bonusBtn.disabled = true;
+                        const h = Math.floor(remainingSeconds / 3600);
+                        const m = Math.floor((remainingSeconds % 3600) / 60);
+                        const s = Math.floor(remainingSeconds % 60);
+                        timerDisplay.innerText = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                    }
+                })
+                .catch(error => console.error('Error getting bonus cooldown:', error));
+            }, 1000);
+        }
+
+        function claimBonus() {
+            fetch(`${API_URL}/api/claim_bonus`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: USER_ID })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.amount > 0) {
+                    USER_DATA.balance = data.balance;
+                    USER_DATA.last_bonus_claim = data.last_bonus_claim;
+                    updateUI();
+                    alert(`Вы получили бонус: ${data.amount} USDT!`);
+                    tg.HapticFeedback.notificationOccurred('success');
+                } else {
+                    alert("Бонус еще не доступен.");
+                    tg.HapticFeedback.notificationOccurred('error');
+                }
+            })
+            .catch(error => console.error('Error claiming bonus:', error));
+        }
+
+        // --- ТОП ИГРОКОВ ---
+        function loadTopUsers() {
+            fetch(`${API_URL}/api/get_top_users`)
+            .then(response => response.json())
+            .then(topUsers => {
+                const topList = document.getElementById('top-users-list');
+                topList.innerHTML = '';
+                topUsers.forEach((user, index) => {
+                    const userElement = document.createElement('div');
+                    userElement.className = 'clan-list-item';
+                    userElement.innerHTML = `
+                        <span>${index + 1}. ${user.nickname}</span>
+                        <span class="clan-points">${user.crypto_balance.toFixed(2)} BTC</span>
+                    `;
+                    topList.appendChild(userElement);
+                });
+            })
+            .catch(error => console.error('Error loading top users:', error));
+        }
+
+        // --- КЛАНЫ ---
+        function createClan() {
+            const clanName = document.getElementById('clan-name-input').value;
+            if (clanName.length < 3) {
+                alert("Название клана слишком короткое.");
+                return;
+            }
+
+            fetch(`${API_URL}/api/create_clan`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: USER_ID, clan_name: clanName })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+                if (data.success) {
+                    document.getElementById('clan-name-input').value = '';
+                    loadClans();
+                }
+            })
+            .catch(error => console.error('Error creating clan:', error));
+        }
+
+        function loadClans() {
+            fetch(`${API_URL}/api/get_clans`)
+            .then(response => response.json())
+            .then(clans => {
+                const clansList = document.getElementById('clans-list');
+                clansList.innerHTML = '';
+                clans.forEach(clan => {
+                    const clanElement = document.createElement('div');
+                    clanElement.className = 'clan-list-item';
+                    clanElement.innerHTML = `
+                        <div>
+                            <div class="clan-name">${clan.name}</div>
+                            <small style="color:var(--gray);">Лидер: ${clan.leader_nickname}</small>
+                        </div>
+                        <span class="clan-points">${clan.points.toFixed(2)} Pts</span>
+                    `;
+                    clansList.appendChild(clanElement);
+                });
+            })
+            .catch(error => console.error('Error loading clans:', error));
+        }
+
+        // --- ПРОФИЛЬ ---
+        function loadProfileData() {
+            document.getElementById('profile-new-nick').value = USER_DATA.nickname;
+            document.getElementById('profile-new-color').value = USER_DATA.nick_color;
+        }
+
+        function saveProfile() {
+            const newNick = document.getElementById('profile-new-nick').value;
+            const newColor = document.getElementById('profile-new-color').value;
+
+            if (newNick.length < 3) {
+                alert("Никнейм должен быть не короче 3 символов.");
+                return;
+            }
+
+            fetch(`${API_URL}/api/update_profile`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: USER_ID, nickname: newNick, color: newColor })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+                if (data.success) {
+                    USER_DATA.balance = data.balance;
+                    USER_DATA.nickname = data.nickname;
+                    USER_DATA.nick_color = data.nick_color;
+                    updateUI();
+                    tg.HapticFeedback.notificationOccurred('success');
+                } else {
+                    tg.HapticFeedback.notificationOccurred('error');
+                }
+            })
+            .catch(error => console.error('Error updating profile:', error));
+        }
+
+        // --- ИСТОРИЯ ---
+        function loadGlobalHistory() {
+            fetch(`${API_URL}/api/get_user_history`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: USER_ID })
+            })
+            .then(response => response
+            .json())
+            .then(history => {
+                const historyList = document.getElementById('global-history-list');
+                historyList.innerHTML = '';
+                history.forEach(entry => {
+                    const statusClass = entry.amount >= 0 ? 'win' : 'loss';
+                    const sign = entry.amount >= 0 ? '+' : '';
+                    const historyElement = document.createElement('div');
+                    historyElement.className = 'history-entry';
+                    historyElement.innerHTML = `
+                        <span>${entry.timestamp} | ${entry.event_type}</span>
+                        <span class="amount ${statusClass}">${sign}${entry.amount.toFixed(2)}</span>
+                    `;
+                    historyList.appendChild(historyElement);
+                });
+            })
+            .catch(error => console.error('Error loading history:', error));
+        }
+
+        // --- ИГРА: РУЛЕТКА ---
+        const rouletteNumbers = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+        const rouletteColors = {
+            0: 'green',
+            1: 'red', 3: 'red', 5: 'red', 7: 'red', 9: 'red', 12: 'red', 14: 'red', 16: 'red', 18: 'red',
+            19: 'red', 21: 'red', 23: 'red', 25: 'red', 27: 'red', 30: 'red', 32: 'red', 34: 'red', 36: 'red'
+        }; // Остальные по умолчанию черные
+
+        function spinRoulette() {
+            const bet = 100; // Фиксированная ставка
+            if (USER_DATA.balance < bet) {
+                alert("Недостаточно USDT для ставки!");
+                tg.HapticFeedback.notificationOccurred('error');
+                return;
+            }
+
+            USER_DATA.balance -= bet;
+            updateUI();
+            
+            const wheel = document.getElementById('roulette-wheel');
+            const resultNumber = Math.floor(Math.random() * 37); // 0-36
+            const resultIndex = rouletteNumbers.indexOf(resultNumber);
+
+            // Рассчитываем поворот
+            const totalRotations = 5 * 360; // 5 полных оборотов
+            const anglePerNumber = 360 / rouletteNumbers.length;
+            const targetAngle = totalRotations - (resultIndex * anglePerNumber); // Учитываем порядок чисел на колесе
+
+            wheel.style.transition = 'transform 4s cubic-bezier(0.1, 0.7, 0.1, 1)';
+            wheel.style.transform = `rotate(${targetAngle}deg)`;
+
+            setTimeout(() => {
+                wheel.style.transition = 'none'; // Сбросить переход для мгновенного сброса
+                wheel.style.transform = `rotate(${targetAngle % 360}deg)`; // Установить конечный угол
+                
+                let winAmount = 0;
+                let outcome = "Проигрыш";
+                // Пример: Ставка на красное/черное. Пока у нас нет UI для выбора ставки, просто делаем рандом
+                const isRed = rouletteColors[resultNumber] === 'red';
+                const isBlack = rouletteColors[resultNumber] === undefined && resultNumber !== 0; // Все, что не красное и не 0
+                const isGreen = resultNumber === 0;
+
+                // Для примера - всегда ставим на красное
+                if (isRed) {
+                    winAmount = bet * 2;
+                    USER_DATA.balance += winAmount;
+                    outcome = "ВЫИГРЫШ!";
+                }
+                
+                updateUI();
+                addRouletteHistory(resultNumber, winAmount - bet);
+                alert(`Выпало: ${resultNumber} (${rouletteColors[resultNumber] || 'black'}). ${outcome}`);
+                tg.HapticFeedback.notificationOccurred(winAmount > 0 ? 'success' : 'error');
+            }, 4000);
+        }
+
+        let rouletteHistory = [];
+        function addRouletteHistory(number, profit) {
+            rouletteHistory.unshift({ number, profit });
+            if (rouletteHistory.length > 30) rouletteHistory.pop();
+            renderRouletteHistory();
+        }
+
+        function renderRouletteHistory() {
+            const historyDiv = document.getElementById('roulette-history');
+            historyDiv.innerHTML = '';
+            rouletteHistory.forEach(entry => {
+                const span = document.createElement('span');
+                span.style.background = entry.number === 0 ? 'var(--green)' : (rouletteColors[entry.number] === 'red' ? 'var(--red)' : '#333');
+                span.style.borderRadius = '50%';
+                span.style.width = '30px';
+                span.style.height = '30px';
+                span.style.display = 'flex';
+                span.style.alignItems = 'center';
+                span.style.justifyContent = 'center';
+                span.style.fontWeight = 'bold';
+                span.innerText = entry.number;
+                historyDiv.appendChild(span);
+            });
+        }
+
+
+        // --- ИГРА: МИНЫ ---
+        let minesGame = {
+            active: false,
+            board: [], // true = bomb, false = safe
+            opened: 0,
+            bet: 0,
+            mineCount: 0,
+            cells: [], // HTML elements
+            currentMultiplier: 1.0
+        };
+
+        document.getElementById('mine-count-slider').addEventListener('input', (e) => {
+            document.getElementById('mine-count-display').innerText = e.target.value;
+        });
+
+        function calculateMinesMultiplier(mineCount, openedCells) {
+            if (openedCells === 0) return 1.0;
+            let totalCells = 25;
+            let safeCells = totalCells - mineCount;
+            let mult = 1.0;
+            for (let i = 0; i < openedCells; i++) {
+                mult *= (totalCells - i) / (safeCells - i);
+            }
+            return Math.round(mult * 0.97 * 100) / 100; // 3% House Edge, 2 знака после запятой
+        }
+
+        function startMines() {
+            minesGame.bet = parseInt(document.getElementById('mine-bet').value);
+            minesGame.mineCount = parseInt(document.getElementById('mine-count-slider').value);
+
+            if (USER_DATA.balance < minesGame.bet || minesGame.bet <= 0) {
+                alert("Недостаточно USDT или некорректная ставка!");
+                tg.HapticFeedback.notificationOccurred('error');
+                return;
+            }
+            if (minesGame.mineCount < 1 || minesGame.mineCount > 24) {
+                alert("Количество мин должно быть от 1 до 24.");
+                return;
+            }
+
+            USER_DATA.balance -= minesGame.bet;
+            updateUI();
+
+            minesGame.active = true;
+            minesGame.opened = 0;
+            minesGame.currentMultiplier = 1.0;
+            document.getElementById('mines-multiplier').innerText = 'x1.00';
+            
+            // Расставляем бомбы
+            let bombPositions = new Set();
+            while (bombPositions.size < minesGame.mineCount) {
+                bombPositions.add(Math.floor(Math.random() * 25));
+            }
+            minesGame.board = Array.from({ length: 25 }, (v, k) => bombPositions.has(k));
+
+            renderMinesBoard();
+            document.getElementById('mine-start-btn').style.display = 'none';
+            document.getElementById('mine-cashout-btn').style.display = 'block';
+            document.getElementById('mines-cashout-value').innerText = ` (0.00)`;
+        }
+
+        function renderMinesBoard() {
+            const boardDiv = document.getElementById('mines-board');
+            boardDiv.innerHTML = '';
+            minesGame.cells = [];
+
+            for (let i = 0; i < 25; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'mine-cell';
+                cell.setAttribute('data-index', i);
+                cell.onclick = () => clickMineCell(i);
+                boardDiv.appendChild(cell);
+                minesGame.cells.push(cell);
+            }
+        }
+
+        function clickMineCell(index) {
+            if (!minesGame.active || minesGame.cells[index].classList.contains('open-win') || minesGame.cells[index].classList.contains('open-lose')) {
+                return;
+            }
+
+            if (minesGame.board[index]) { // Мина!
+                minesGame.active = false;
+                minesGame.cells[index].classList.add('open-lose');
+                minesGame.cells[index].innerText = '💣';
+                alert("ВЗРЫВ! Вы проиграли.");
+                
+                // Раскрыть все бомбы
+                minesGame.board.forEach((isBomb, idx) => {
+                    if (isBomb && idx !== index) {
+                        minesGame.cells[idx].classList.add('open-lose');
+                        minesGame.cells[idx].innerText = '💣';
+                    }
+                });
+
+                document.getElementById('mine-start-btn').style.display = 'block';
+                document.getElementById('mine-cashout-btn').style.display = 'none';
+                tg.HapticFeedback.notificationOccurred('error');
+
+            } else { // Сейф
+                minesGame.cells[index].classList.add('open-win');
+                minesGame.cells[index].innerText = '💎';
+                minesGame.opened++;
+                
+                minesGame.currentMultiplier = calculateMinesMultiplier(minesGame.mineCount, minesGame.opened);
+                const potentialWin = Math.round(minesGame.bet * minesGame.currentMultiplier);
+                document.getElementById('mines-multiplier').innerText = `x${minesGame.currentMultiplier.toFixed(2)}`;
+                document.getElementById('mines-cashout-value').innerText = ` (${potentialWin.toFixed(2)})`;
+                tg.HapticFeedback.impactOccurred('medium');
+
+                if (minesGame.opened + minesGame.mineCount === 25) { // Все сейфы открыты
+                    cashoutMines();
+                }
+            }
+        }
+
+        function cashoutMines() {
+            if (!minesGame.active || minesGame.opened === 0) return;
+
+            minesGame.active = false;
+            const winAmount = minesGame.bet * minesGame.currentMultiplier;
+            USER_DATA.balance += winAmount;
+            updateUI();
+            alert(`ВЫИГРЫШ! Вы забрали ${winAmount.toFixed(2)} USDT.`);
+            
+            document.getElementById('mine-start-btn').style.display = 'block';
+            document.getElementById('mine-cashout-btn').style.display = 'none';
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+
+        // --- ИГРА: DICE ---
+        let diceHistory = [];
+        function playDice(button) {
+            const bet = parseInt(document.getElementById('dice-bet').value);
+            const betType = button.getAttribute('data-type');
+            const multiplier = parseFloat(button.getAttribute('data-mult'));
+
+            if (USER_DATA.balance < bet || bet <= 0) {
+                alert("Недостаточно USDT или некорректная ставка!");
+                tg.HapticFeedback.notificationOccurred('error');
+                return;
+            }
+
+            USER_DATA.balance -= bet;
+            updateUI();
+
+            const result = Math.floor(Math.random() * 13); // 0-12
+            document.getElementById('dice-result').innerText = result;
+
+            let won = false;
+            if (betType === 'less' && result < 6) won = true;
+            else if (betType === 'equal' && result === 6) won = true;
+            else if (betType === 'more' && result > 6) won = true;
+
+            let profit = 0;
+            if (won) {
+                profit = bet * multiplier;
+                USER_DATA.balance += profit;
+                alert(`ВЫИГРЫШ! Выпало: ${result}. Ваш выигрыш: ${profit.toFixed(2)} USDT.`);
+                tg.HapticFeedback.notificationOccurred('success');
+            } else {
+                alert(`ПРОИГРЫШ! Выпало: ${result}.`);
+                tg.HapticFeedback.notificationOccurred('error');
+            }
+            
+            updateUI();
+            addDiceHistory(result, profit - bet);
+        }
+
+        function addDiceHistory(number, profit) {
+            diceHistory.unshift({ number, profit });
+            if (diceHistory.length > 30) diceHistory.pop();
+            renderDiceHistory();
+        }
+
+        function renderDiceHistory() {
+            const historyDiv = document.getElementById('dice-history');
+            historyDiv.innerHTML = '';
+            diceHistory.forEach(entry => {
+                const span = document.createElement('span');
+                span.style.background = entry.profit >= 0 ? 'var(--green)' : 'var(--red)';
+                span.style.borderRadius = '5px';
+                span.style.padding = '5px 8px';
+                span.style.fontSize = '12px';
+                span.style.fontWeight = 'bold';
+                span.innerText = entry.number;
+                historyDiv.appendChild(span);
+            });
+        }
+    </script>
+</body>
+</html>
